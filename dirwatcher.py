@@ -10,11 +10,11 @@ the program.  Author tag (below) helps instructors keep track of who
 wrote what, when grading.
 """
 import argparse
-import sys
-import signal
 import logging
-import time
 import os
+import signal
+import sys
+import time
 
 
 __author__ = "Jacob Walker"
@@ -23,10 +23,37 @@ logging.basicConfig(filename='test.log', level=logging.INFO,
                     format='%(levelname)s:%(message)s')
 
 # declare a few constants
+checked_files = {}
 
-def first_helper_func(x):
-    """docstring as first line"""
-    print("inside first_helper() with x={}".format(x))
+
+def magic_word_finder(directory, magic_word):
+    d = os.path.abspath(directory)
+    text_files = [f for f in os.listdir(d) if ".txt" in f]
+    for f in text_files:
+        line_count = len(open(f).readlines())
+        if f not in checked_files:
+            checked_files[f] = 0
+            logging.info("checking... " + f)
+            search_file(f, magic_word)
+        else:
+            if checked_files[f] != 0 and line_count != checked_files[f]:
+                logging.info(
+                    "File {} changed, searching again".format(f))
+                search_file(f, magic_word)
+
+
+def search_file(f, magic_word):
+    logging.info("searching {} for instances of {}".format(f, magic_word))
+
+    with open(f) as doc:
+        content = doc.readlines()
+        last_index = 0
+        for i, line in enumerate(content):
+            last_index += 1
+            if magic_word in line:
+                logging.info("Match found for {} found on line {} in {}".format(
+                    magic_word, i + 1, f))
+        checked_files[f] = last_index
 
 
 def signal_handler(sig_num, frame):
@@ -53,7 +80,7 @@ def create_parser():
                         '--interval',
                         help='Sets the interval in seconds to check the directory for magic words',
                         default=1)
-    parser.add_argument('-x', '--extension', help='Sets teh type of file to watch for', default='.txt')
+    parser.add_argument('-x', '--extension', help='Sets the type of file to watch for', default='.txt')
     return parser
 
 
@@ -68,10 +95,10 @@ def main(args):
 
     while 1:
         try:
-            print("main args: {}".format(args))
+            magic_word_finder(os.path.join(os.getcwd(), parsed_args.directory), parsed_args.magic_word)
         except Exception as e:
             logging.exception(e)
-        time.sleep(10)
+        time.sleep(parsed_args.interval)
 
 
 if __name__ == '__main__':
