@@ -35,6 +35,7 @@ checked_files = {}
 def magic_word_finder(directory, magic_word):
     d = os.path.abspath(directory)
     text_files = [f for f in os.listdir(d) if ".txt" in f]
+    text_files = [f for f in os.listdir(d) if extension in f]
     for f in text_files:
         line_count = len(open(f).readlines())
         if f not in checked_files:
@@ -50,6 +51,7 @@ def magic_word_finder(directory, magic_word):
 
 def search_file(f, magic_word):
     logging.info("searching {} for instances of {}".format(f, magic_word))
+    logger.info("searching {} for instances of {}".format(f, magic_word))
 
     with open(f) as doc:
         content = doc.readlines()
@@ -58,8 +60,8 @@ def search_file(f, magic_word):
             last_index += 1
             if magic_word in line:
                 logger.info("Match found for {} found on line {} in {}"
-                    magic_word, i + 1, f))
-        checked_files[f] = last_index
+                            .format(magic_word, i + 1, f))
+        checked_files[f] = i + 1
 
 
 def signal_handler(sig_num, frame):
