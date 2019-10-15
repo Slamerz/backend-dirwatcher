@@ -19,8 +19,14 @@ import time
 
 __author__ = "Jacob Walker"
 
-logging.basicConfig(filename='test.log', level=logging.INFO,
-                    format='%(levelname)s:%(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s -'
+                              ' %(levelname)s - %(message)s')
+log_stream = logging.StreamHandler(sys.stdout)
+log_stream.setLevel(logging.INFO)
+log_stream.setFormatter(formatter)
+logger.addHandler(log_stream)
 
 # declare a few constants
 checked_files = {}
@@ -33,11 +39,11 @@ def magic_word_finder(directory, magic_word):
         line_count = len(open(f).readlines())
         if f not in checked_files:
             checked_files[f] = 0
-            logging.info("checking... " + f)
+            logger.info("checking... " + f)
             search_file(f, magic_word)
         else:
             if checked_files[f] != 0 and line_count != checked_files[f]:
-                logging.info(
+                logger.info(
                     "File {} changed, searching again".format(f))
                 search_file(f, magic_word)
 
@@ -51,7 +57,7 @@ def search_file(f, magic_word):
         for i, line in enumerate(content):
             last_index += 1
             if magic_word in line:
-                logging.info("Match found for {} found on line {} in {}".format(
+                logger.info("Match found for {} found on line {} in {}"
                     magic_word, i + 1, f))
         checked_files[f] = last_index
 
