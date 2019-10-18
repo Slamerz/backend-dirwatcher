@@ -16,7 +16,6 @@ import signal
 import sys
 import time
 
-
 __author__ = "Jacob Walker"
 
 logger = logging.getLogger(__name__)
@@ -30,6 +29,7 @@ logger.addHandler(log_stream)
 
 # declare a few constants
 checked_files = {}
+exit_flag = False
 
 
 def magic_word_finder(directory, magic_word, extension):
@@ -37,15 +37,20 @@ def magic_word_finder(directory, magic_word, extension):
     and searches for given text."""
     d = os.path.abspath(directory)
 
-    text_files = [f for f in os.listdir(d) if extension in f]
+    text_files = [f for f in os.listdir(d) if f.endswith(extension)]
     for f in text_files:
-        line_count = len(open(f).readlines())
+        full_path = os.path.join(d, f)
+        fd = open(full_path)
+        line_count = len(fd.readlines())
+        fd.close()
+
+        f = full_path
         if f not in checked_files:
             checked_files[f] = 0
             logger.info("checking... " + f)
             search_file(f, magic_word)
         else:
-            if checked_files[f] != 0 and line_count != checked_files[f]:
+            if line_count != checked_files[f] and line_count != 0:
                 logger.info(
                     "File {} changed, searching again".format(f))
                 search_file(f, magic_word)
@@ -56,11 +61,13 @@ def search_file(f, magic_word):
     logger.info("searching {} for instances of {}".format(f, magic_word))
 
     with open(f) as doc:
-        content = doc.readlines()
-        for i, line in enumerate(content):
+        start_line = checked_files[f]
+        content = doc.readlines()[start_line:]
+        i = 0
+        for i, line in enumerate(content, start=start_line):
             if magic_word in line:
                 logger.info("Match found for {} found on line {} in {}"
-                            .format(magic_word, i + 1, f))
+                            .format(magic_word, i+1, f))
         checked_files[f] = i + 1
 
 
@@ -75,8 +82,9 @@ def signal_handler(sig_num, frame):
     """
     signame = dict((k, v) for v, k in reversed(sorted(signal.__dict__.items()))
                    if v.startswith('SIG') and not v.startswith('SIG_'))
-    logging.warning('Received {}'.format(signame[sig_num]))
-    raise KeyboardInterrupt
+    logger.warning('Received {}'.format(signame[sig_num]))
+    global exit_flag
+    exit_flag = True
 
 
 def create_parser():
@@ -88,7 +96,8 @@ def create_parser():
                         '--interval',
                         help='Sets the interval in seconds to check the '
                              'directory for magic words',
-                        default=1)
+                        type=float,
+                        default=1.0)
     parser.add_argument('-x', '--extension', help='Sets the type of file to '
                                                   'watch for', default='.txt')
     return parser
@@ -98,31 +107,34 @@ def main(args):
     """Main function is declared as standalone, for testability"""
     parser = create_parser()
     parsed_args = parser.parse_args(args)
-    print(parsed_args)
-    print("Starting App")
+    logger.info(parsed_args)
+    logger.info("Starting App")
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+    start_time = time.time()
 
-    while 1:
+    while not exit_flag:
         try:
             magic_word_finder(
-                os.path.join(os.getcwd(), parsed_args.directory),
+                parsed_args.directory,
                 parsed_args.magic_word,
-                parsed_args.extension
+                parsed_args.extension,
             )
+            time.sleep(parsed_args.interval)
+        except OSError as e:
+            logger.warning(e)
+            time.sleep(10)
         except Exception as e:
-            logging.exception(e)
-        time.sleep(parsed_args.interval)
+            logger.exception(e)
+            time.sleep(10)
+
+    logger.info("\nExiting.\n"
+                "Process ran for {} seconds".format(time.time() - start_time))
 
 
 if __name__ == '__main__':
     """Runs the main loop until an interrupt like control+c are input."""
-    print("My Pid is {}".format(os.getpid()))
-    print("Command line arguments: {}".format(sys.argv))
-    start_time = time.time()
-    try:
-        main(sys.argv[1:])
-    except KeyboardInterrupt:
-        print("\nExiting by user request.\n"
-              "Process ran for {} seconds".format(time.time() - start_time))
-        sys.exit(0)
+    logger.info("My Pid is {}".format(os.getpid()))
+    logger.info("Command line arguments: {}".format(sys.argv))
+    main(sys.argv[1:])
+
